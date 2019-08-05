@@ -1,0 +1,31 @@
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX ipo: <http://purl.org/dc/terms/isPartOf> 
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX hgm: <http://linked.data.gov.au/def/loci/hadGenerationMethod>
+
+INSERT { GRAPH <http://linked.data.gov.au/dataset/cache_inference> {
+   _:b ipo: ?ls ;
+       rdf:subject ?y ;
+       rdf:predicate geo:sfWithin ;
+       rdf:object ?x .
+   _:b hgm: ?gm .
+} }
+WHERE {
+   ?st ipo: ?ls . 
+   ?st rdf:subject ?x .
+   ?st rdf:predicate geo:sfContains .
+   ?st rdf:object ?y .
+    OPTIONAL {
+        ?st hgm: ?gm .
+    }
+   FILTER NOT EXISTS {     
+    ?s2 ipo: ?ls . 
+    ?s2 rdf:subject ?y .
+    ?s2 rdf:predicate geo:sfWithin .
+    ?s2 rdf:object ?x 
+   }
+   FILTER NOT EXISTS { ?y geo:sfEquals ?x }
+   FILTER NOT EXISTS { ?y owl:sameAs ?x }
+   FILTER ( !sameTerm(?y, ?x) )
+}

@@ -18,3 +18,7 @@ echo "Harvesting Datasets"
 #Download Linksets
 
 #Download Ontologies
+
+#Cleanup
+
+#Setup and Serve Cache in GraphDB

@@ -1,0 +1,14 @@
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+INSERT { GRAPH <http://linked.data.gov.au/dataset/cache_inference> {
+    ?y geo:sfWithin ?x .
+} }
+WHERE {
+   ?x geo:sfContains ?y .
+   FILTER NOT EXISTS { ?y geo:sfWithin ?x } # can be omitted
+   FILTER NOT EXISTS { ?y geo:sfEquals ?x }
+   FILTER NOT EXISTS { ?y owl:sameAs ?x }
+   FILTER ( !sameTerm(?y, ?x) )
+}

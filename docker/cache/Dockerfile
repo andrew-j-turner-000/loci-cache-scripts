@@ -18,22 +18,29 @@ RUN \
 # Set environment variables
 ENV APP_HOME='/app'
 ENV JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64"
+ENV GRAPHDB_HOME="/graphdb"
+ENV GRAPHDB_ZIP="${APP_HOME}/graphdb.zip"
+ENV REPO_CONFIG="${APP_HOME}/repo-config.ttl"
+ENV GRAPHDBSOURCE=${GRAPHDBSOURCE:-"${APP_HOME}/cachedata"}
+# Set GraphDB Max and Min Heap size (must be less than available RAM)
+ENV GDB_HEAP_SIZE="8g"
 
 WORKDIR ${APP_HOME}
 
-RUN wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/script-resources/graph-cache/graphdb-free-8.10.0-dist.zip -O ${APP_HOME}/graphdb.zip
-RUN unzip ${APP_HOME}/graphdb.zip -d ${APP_HOME}/graphdb && \
-    mv ${APP_HOME}/graphdb/graphdb-free-8.10.0 /graphdb
+RUN wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/script-resources/graph-cache/graphdb-free-8.10.0-dist.zip -O ${GRAPHDB_ZIP}
+# COPY ./graphdb-free-8.10.0-dist.zip ${GRAPHDB_ZIP}
+RUN unzip ${GRAPHDB_ZIP} -d ${APP_HOME}/graphdb && \
+    mv ${APP_HOME}/graphdb/graphdb-* ${GRAPHDB_HOME} && \
+    rm ${GRAPHDB_ZIP}    
 
-# Set GraphDB Max and Min Heap size
-ENV GDB_HEAP_SIZE="4g"
+COPY ./graphdb.properties ${GRAPHDB_HOME}/conf/graphdb.properties
+COPY repo-config.ttl ${REPO_CONFIG}
+COPY download-data.sh .
+COPY ./pre-condition-files/* pre-condition-files/
 
-#Import the data
-ENV GRAPHDBSOURCE=${GRAPHDBSOURCE:-"/tmp/cachedata"}
-WORKDIR ${GRAPHDBSOURCE}
-COPY download-data.sh ${APP_HOME}
+#Build the Cache
+COPY build-cache.sh ${APP_HOME}
 WORKDIR ${APP_HOME}
-RUN ./download-data.sh
-
 EXPOSE 7200
-CMD ["/graphdb/bin/graphdb"]
+
+CMD ["/bin/bash", "-c", "${APP_HOME}/build-cache.sh"]

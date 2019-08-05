@@ -1,0 +1,24 @@
+PREFIX asgs: <http://linked.data.gov.au/def/asgs#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX w1: <http://linked.data.gov.au/def/asgs#isStatisticalAreaLevel1Of>
+PREFIX w2: <http://linked.data.gov.au/def/asgs#isStatisticalAreaLevel2Of>
+PREFIX w3: <http://linked.data.gov.au/def/asgs#isStatisticalAreaLevel3Of>
+PREFIX w4: <http://linked.data.gov.au/def/asgs#isStatisticalAreaLevel4Of>
+PREFIX w5: <http://linked.data.gov.au/def/asgs#isStateOrTerritoryOf>
+
+INSERT {
+    GRAPH <http://linked.data.gov.au/dataset/cache_inference> {
+        ?s geo:sfContains ?o .
+        ?o geo:sfWithin ?s .
+        _:b1 rdf:subject ?s ;
+             rdf:predicate geo:sfContains ;
+             rdf:object ?o .
+        _:b2 rdf:subject ?o ;
+             rdf:predicate geo:sfWithin ;
+             rdf:object ?s .
+    }
+}
+WHERE { 
+	?s w1:|w2:|w3:|w4:|w5: ?o .
+}

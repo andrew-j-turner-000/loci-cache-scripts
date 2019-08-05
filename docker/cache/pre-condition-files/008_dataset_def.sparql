@@ -1,0 +1,9 @@
+PREFIX dcat: <http://www.w3.org/ns/dcat#>
+
+INSERT DATA {
+    <http://linked.data.gov.au/dataset/gnaf> a dcat:Dataset .
+    <http://linked.data.gov.au/dataset/gnaf-2016-05> a dcat:Dataset .
+    <http://linked.data.gov.au/dataset/geofabric> a dcat:Dataset .
+    <http://linked.data.gov.au/dataset/asgs2016> a dcat:Dataset .
+    <http://linked.data.gov.au/dataset/asgs2011> a dcat:Dataset .
+}

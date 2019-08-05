@@ -1,0 +1,22 @@
+version: "3.7"
+
+services:
+    graphcache:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        environment: 
+            - GRAPHDB_HOME
+            - GRAPHDBSOURCE
+        volumes:
+#            - "/etc/localtime:/etc/localtime:ro"
+#            - "/etc/timezone:/etc/timezone:ro"
+            - "/tmp:/tmp"
+            - "graphdb_data:${GRAPHDB_HOME}"
+            - "data_cache:${GRAPHDBSOURCE}"
+        ports:
+            - "80:7200"
+
+volumes:
+    graphdb_data:
+    data_cache:
