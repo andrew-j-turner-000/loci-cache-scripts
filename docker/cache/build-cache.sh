@@ -43,6 +43,8 @@ if [ -z "$(ls -A $GRAPHDBSOURCE)" ] || [ -n "${FORCE_REFRESH}" ]; then
         curl -X POST ${STATEMENTS_ENDPOINT} -H "Content-Type: application/x-www-form-urlencoded" -H "Accept: application/sparql-results+json" --data-urlencode "update@$filename"
     done
 
+    unset FORCE_REFRESH
+
     echo "Wait now for GraphDB to exit"
     wait
 else
