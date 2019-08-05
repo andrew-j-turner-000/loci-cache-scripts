@@ -2,6 +2,7 @@ version: "3.7"
 
 services:
     graphcache:
+        restart: unless-stopped
         build:
             context: .
             dockerfile: Dockerfile
