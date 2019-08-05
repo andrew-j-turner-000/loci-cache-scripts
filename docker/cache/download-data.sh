@@ -2,6 +2,8 @@
 
 #Linksets
 wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/linksets/ls_mb16cc.ttl
+wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/linksets/ls_addrcatch.trig
+
 #mb11mb16
 #addrcatch-linkset
 #addrmb11-linkset
@@ -10,15 +12,14 @@ wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/linksets/ls_mb16cc.ttl
 #addr1605mb16-linkset
 
 #Datasets
-#wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/auto-generated/datasets/asgs2016.trig.gz
-#wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/auto-generated/datasets/geofabric.trig.gz
-#wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/auto-generated/datasets/gnaf_current.trig.gz
+wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/auto-generated/datasets/asgs2016.trig.gz
+wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/auto-generated/datasets/geofabric.trig.gz
+wget https://loci-assets.s3-ap-southeast-2.amazonaws.com/auto-generated/datasets/gnaf_current.trig.gz
 
 #Registries
-#wget http://linked.data.gov.au/dataset/asgs2016/reg/?_view=reg&_format=text/turtle -O asgs2016.reg.ttl
-#wget http://linked.data.gov.au/dataset/geofabric/?_view=reg&_format=text/turtle -O geofabric.reg.ttl
-#wget http://linked.data.gov.au/dataset/gnaf/?_view=reg&_format=text/turtle -O gnafCurrent.reg.ttl
-
+wget http://linked.data.gov.au/dataset/asgs2016/reg/?_view=reg&_format=text/turtle -O asgs2016.reg.ttl
+wget http://linked.data.gov.au/dataset/geofabric/?_view=reg&_format=text/turtle -O geofabric.reg.ttl
+wget http://linked.data.gov.au/dataset/gnaf/?_view=reg&_format=text/turtle -O gnafCurrent.reg.ttl
 
 #Published Ontologies
 # wget http://linked.data.gov.au/def/asgs.ttl -O asgs.ont.ttl
