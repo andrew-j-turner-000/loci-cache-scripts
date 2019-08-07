@@ -16,7 +16,7 @@ RUN apt-get update
 RUN apt-get remove -y binutils
 
 # Install GDAL dependencies
-RUN apt-get -t unstable install -y libgdal-dev g++ postgresql-11
+RUN apt-get -t unstable install -y libgdal-dev g++ postgresql-11 gdal-bin
 
 # Update C env vars so compiler can find gdal
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
