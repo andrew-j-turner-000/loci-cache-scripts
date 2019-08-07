@@ -1,0 +1,16 @@
+version: '3.4'
+
+services:
+  linksets:
+    build: 
+      context: linksets-builder 
+      target: python-specific
+
+    volumes:
+      - ..:/app
+    links: 
+      - postgis
+    command: /bin/sh -c 'tail -f /dev/null'
+
+  postgis:
+    image: mdillon/postgis:11

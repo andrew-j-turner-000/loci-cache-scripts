@@ -1,0 +1,155 @@
+First, create the DB you want to use in Postgres, (in this doc it is named mydb)
+Enable PostGIS extension:
+---
+CREATE EXTENSION postgis;
+CREATE EXTENSION postgis_topology;
+---
+
+To load ASGS MBs into PostGIS:
+$ ogr2ogr -f "PostgreSQL" PG:"host=localhost port=5432 dbname=mydb user=postgres password=password" "WFS:https://geo.abs.gov.au/arcgis/services/ASGS2016/MB/MapServer/WFSServer" -overwrite -progress -nlt MULTIPOLYGON --config PG_USE_COPY YES
+Note:
+`-nlt MULTIPOLYGON` is specified here, because by default it will ingest as MULTISURFACE, which doesn't work well for our use-case.
+There will be some errors when it tries to import mb:mb_pt, because it POINTS don't work with MULTIPOLYGON layer types. Ignore this. We don't use mb_pt
+All ASGS coords are in crs EPSG:3857, this needs to be transformed to albers (EPSG:3577) in the sql query in order to do constant-area intersections with catchments 
+  eg: ST_Transform(wkb_geometry, 3577)
+
+To load Geofabric Catchments into PostGIS:
+$ ogr2ogr -f "PostgreSQL" PG:"host=localhost port=5432 dbname=mydb user=postgres password=password" ./HR_Catchments_GDB/HR_Catchments.gdb -overwrite -progress --config PG_USE_COPY YES 
+Note:
+No need to set -nlt MULTIPOLYGON here, because the .gdb file already defines the shapes as MULTIPOLYGON
+All Geofabric cooards are in crs EPSG:4326 (WGS-84), but the geometry column in the catchments table DOES NOT contain a SRID declaration, so you need to add it yourself in the query
+  eg: ST_GeomFromWKB(wkb_geometry, 4326)
+Then we need to convert it to albers (EPSG:3577) in order to do constant-area intersections with meshblocks.
+  
+
+--CREATE new columns with converted data
+---
+ALTER TABLE public."mb:mb" ADD COLUMN geom_3577 geometry(Geometry,3577);
+UPDATE public."mb:mb" SET geom_3577 = ST_MakeValid(ST_Transform(wkb_geometry,3577));
+
+ALTER TABLE public."ahgfcontractedcatchment" ADD COLUMN geom_3577 geometry(Geometry,3577);
+UPDATE public."ahgfcontractedcatchment" SET geom_3577 = ST_Transform(ST_MakeValid(ST_GeomFromWKB(wkb_geometry, 4326)),3577);
+---
+
+--CREATE Indexes:
+---
+CREATE INDEX mb_geom_3577_gix ON public."mb:mb" USING GIST (geom_3577);
+CREATE INDEX cc_geom_3577_gix ON public."ahgfcontractedcatchment" USING GIST (geom_3577);
+---
+
+--EXAMPLE SQL Query:
+--Example st_within query
+---
+SELECT ca.objectid, ST_AsGeoJSON(ca.geom_3577), ST_AsGeoJSON(mb.geom_3577), mb.mb_code_2016
+FROM ahgfcontractedcatchment as ca, "mb:mb" as mb
+WHERE ca.hydroid=9550002 and ST_Within(mb.geom_3577, ca.geom_3577)
+ORDER BY ca.objectid ASC LIMIT 1
+---
+
+
+--CREATE Materialized Views of intersections
+--These take approx 5-10mins each to run.
+---
+CREATE MATERIALIZED VIEW mbintersectcc_mv AS
+SELECT mb.mb_code_2016, ca.hydroid, ST_Intersection(mb.geom_3577, ca.geom_3577) as i
+FROM public."ahgfcontractedcatchment" as ca
+INNER JOIN public."mb:mb" as mb ON mb.geom_3577 && ca.geom_3577 -- the && specifies an indexed bounding box lookup
+WHERE ST_IsValid(ca.geom_3577) AND ST_IsValid(mb.geom_3577) AND ST_Intersects(mb.geom_3577, ca.geom_3577)
+ORDER BY mb.mb_code_2016 ASC;
+
+CREATE MATERIALIZED VIEW ccintersectmb_mv AS
+SELECT ca.hydroid, mb.mb_code_2016, ST_Intersection(ca.geom_3577, mb.geom_3577) as i
+FROM public."mb:mb" as mb
+INNER JOIN public."ahgfcontractedcatchment" as ca ON ca.geom_3577 && mb.geom_3577 -- the && specifies an indexed bounding box lookup
+WHERE ST_IsValid(ca.geom_3577) AND ST_IsValid(mb.geom_3577) AND ST_Intersects(ca.geom_3577, mb.geom_3577)
+ORDER BY ca.hydroid ASC;
+---
+
+
+--CREATE Other useful views
+---
+CREATE VIEW mbintersectccareas AS
+SELECT s.mb_code_2016, s.hydroid, s.mb_area, s.cc_area, s.i_area, (s.i_area / s.mb_area) as mb_proportion, (s.i_area / s.cc_area) as cc_proportion, s.geomcollection FROM (
+    SELECT mv.mb_code_2016,
+           mv.hydroid,
+           ST_Area(mb.geom_3577)                         as mb_area,
+           ST_Area(ca.geom_3577)                         as cc_area,
+           ST_Area(mv.i)                                 as i_area,
+           ST_Collect(ARRAY[ca.geom_3577, mb.geom_3577, mv.i]) as geomcollection
+    FROM mbintersectcc_mv as mv
+    INNER JOIN public."mb:mb" as mb ON mb.mb_code_2016 = mv.mb_code_2016
+    INNER JOIN public."ahgfcontractedcatchment" as ca ON ca.hydroid = mv.hydroid
+) as s;
+
+CREATE VIEW ccintersectmbareas AS
+SELECT s.hydroid, s.mb_code_2016, s.cc_area, s.mb_area, s.i_area, (s.i_area / s.cc_area) as cc_proportion, (s.i_area / s.mb_area) as mb_proportion, s.geomcollection FROM (
+    SELECT mv.hydroid,
+           mv.mb_code_2016,
+           ST_Area(ca.geom_3577)                         as cc_area,
+           ST_Area(mb.geom_3577)                         as mb_area,
+           ST_Area(mv.i)                                 as i_area,
+           ST_Collect(ARRAY[mb.geom_3577, ca.geom_3577, mv.i]) as geomcollection
+    FROM ccintersectmb_mv as mv
+    INNER JOIN public."ahgfcontractedcatchment" as ca ON ca.hydroid = mv.hydroid
+    INNER JOIN public."mb:mb" as mb ON mb.mb_code_2016 = mv.mb_code_2016
+) as s;
+---
+
+---Find bad meshblocks --
+---
+CREATE MATERIALIZED VIEW bad_meshblocks as
+  SELECT mb.mb_code_2016, mb.hydroid FROM mbintersectccareas as mb
+  WHERE mb.mb_area < 1100.0 and ((mb_proportion >= 0.010)or(cc_proportion >= 0.010)) and i_area <= 50.0;
+---
+
+
+--OUR Classifier views, based on our 1% and 99% logic.
+---
+CREATE VIEW mbintersectccareas_classify AS
+SELECT mb.*, mb_proportion >= 0.010 as is_overlaps, mb_proportion >=0.990 as is_within
+FROM mbintersectccareas as mb;
+-- (TODO: minus bad meshblocks)
+
+CREATE VIEW ccintersectmbareas_classify AS
+SELECT cc.*, cc_proportion >= 0.010 as is_overlaps, cc_proportion >=0.990 as is_within
+FROM ccintersectmbareas as cc;
+---
+
+
+--EXAMPLE SQL Query:
+--Show a GeoJSON representation of the geometries involved where a ContractedCatchment is within a meshblock
+---
+SELECT v.hydroid, v.mb_code_2016, ST_AsGeoJSON(v.geomcollection)
+FROM ccintersectmbareas as v
+WHERE v.hydroid='9550013' AND v.mb_code_2016='60044880000';
+---
+--Find all occurances where a meshblock is within a catchment, but there are no catchments within that meshblock (technically shouldn't exist?)
+---
+SELECT * FROM mbintersectcc_mv as mb
+LEFT JOIN ccintersectmb_mv as cc ON mb.mb_code_2016 = cc.mb_code_2016
+WHERE cc.mb_code_2016 is NULL;
+---
+--Find all occurances where a catchment is within a meshblock, but there are no meshblocks within that catchment (technically shouldn't exist?)
+---
+SELECT * FROM ccintersectmb_mv as cc
+LEFT JOIN mbintersectcc_mv as mb ON cc.hydroid = mb.hydroid
+WHERE mb.hydroid is NULL;
+---
+
+
+-- To generate overlaps entries:
+---
+SELECT mb.mb_code_2016, cc.hydroid, mb.mb_area, cc.cc_area, mb.i_area, cc.i_area, mb.mb_proportion, cc.cc_proportion, mb.is_overlaps, cc.is_overlaps, mb.is_within, cc.is_within 
+FROM public."mbintersectccareas_classify" as mb
+INNER JOIN public."ccintersectmbareas_classify" as cc on mb.mb_code_2016 = cc.mb_code_2016 and mb.hydroid = cc.hydroid
+WHERE mb.is_overlaps and (not mb.is_within)
+ORDER BY mb.mb_code_2016;
+---
+-- To generate within entries
+---
+SELECT mb.mb_code_2016, cc.hydroid, mb.mb_area, cc.cc_area, mb.i_area, cc.i_area, mb.mb_proportion, cc.cc_proportion, mb.is_overlaps, cc.is_overlaps, mb.is_within, cc.is_within 
+FROM public."mbintersectccareas_classify" as mb
+INNER JOIN public."ccintersectmbareas_classify" as cc on mb.mb_code_2016 = cc.mb_code_2016 and mb.hydroid = cc.hydroid
+WHERE mb.is_within
+ORDER BY mb.mb_code_2016;
+---
