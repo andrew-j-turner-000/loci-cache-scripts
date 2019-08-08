@@ -7,10 +7,10 @@ INSERT {
     	?s geo:sfWithin ?o .
         ?o geo:sfContains ?s .
         _:b1 rdf:subject ?s ;
-             rdf:predicate geo:sfContains ;
+             rdf:predicate geo:sfWithin ;
              rdf:object ?o .
         _:b2 rdf:subject ?o ;
-             rdf:predicate geo:sfWithin ;
+             rdf:predicate geo:sfContains ;
              rdf:object ?s .
     }
 }
