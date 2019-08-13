@@ -22,12 +22,15 @@ wget 'http://linked.data.gov.au/dataset/geofabric/?_view=reg&_format=text/turtle
 wget 'http://linked.data.gov.au/dataset/gnaf/?_view=reg&_format=text/turtle' -O gnafCurrent.reg.ttl
 
 #Published Ontologies
-# wget http://linked.data.gov.au/def/asgs.ttl -O asgs.ont.ttl
-wget 'https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/asgs.ttl' -O asgs.ont.ttl
-# wget http://gnafld.net/def/gnaf.ttl -O gnaf.ont.ttl
-wget 'https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/gnaf.ttl' -O gnaf.ont.ttl
-# wget http://www.linked.data.gov.au/def/geofabric/geofabric.ttl -O geofabric.ont.ttl
-wget 'https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/geofabric.ttl' -O geofabric.ont.ttl
+wget --header='Accept: text/turtle' http://linked.data.gov.au/def/asgs -O asgs.ont.ttl
+# wget https://raw.githubusercontent.com/AGLDWG/asgs-ont/master/asgs.ttl -O asgs.ont.ttl
+# wget 'https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/asgs.ttl' -O asgs.ont.ttl
+wget --header='Accept: text/turtle' http://linked.data.gov.au/def/gnaf -O gnaf.ont.ttl
+# wget https://raw.githubusercontent.com/AGLDWG/gnaf-ont/master/gnaf.ttl -O gnaf.ont.ttl
+# wget 'https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/gnaf.ttl' -O gnaf.ont.ttl
+wget --header='Accept: text/turtle' http://linked.data.gov.au/def/geofabric -O geofabric.ont.ttl
+# wget https://raw.githubusercontent.com/CSIRO-enviro-informatics/geofabric-ont/master/geofabric.ttl -O gnaf.ont.ttl
+# wget 'https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/geofabric.ttl' -O geofabric.ont.ttl
 wget 'https://www.opengis.net/def/appschema/hy_features/hyf/hyf.ttl' -O hy_features.ont.ttl
 
 # wget http://www.linked.data.gov.au/def/loci/loci.ttl -O loci.ont.ttl
