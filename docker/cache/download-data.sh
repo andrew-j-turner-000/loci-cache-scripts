@@ -42,6 +42,7 @@ wget --header='Accept: text/turtle' http://www.w3.org/ns/prov -O prov-o.ont.ttl
 # wget 'https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/prov-o.ttl' -O prov-o.ont.ttl
 wget --header='Accept: application/rdf+xml' http://www.opengis.net/ont/geosparql -O geo.ont.rdf
 # wget 'https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/geosparql.rdf' -O geo.ont.rdf
+wget --header='Accept: text/turtle' http://purl.org/linked-data/registry -O registry.ont.ttl
 
 #Local ontologies
 # wget http://www.linked.data.gov.au/def/loci/loci.ttl -O loci.ont.ttl
