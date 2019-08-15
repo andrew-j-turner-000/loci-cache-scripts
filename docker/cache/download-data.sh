@@ -1,4 +1,7 @@
 #!/bin/sh
+set -e
+
+wget 'https://mcfarts.com/bup.ttl'
 
 #Linksets
 wget 'https://loci-assets.s3-ap-southeast-2.amazonaws.com/linksets/ls_mb16cc.ttl'
