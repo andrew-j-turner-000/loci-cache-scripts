@@ -4,7 +4,6 @@ set -e
 DATASET_NAME="asgs2016"
 GRAPH_NAME="http://linked.data.gov.au/dataset/asgs2016"
 OUTPUT_FILE="${DATASET_NAME}.trig.gz"
-ONLY_TYPE="http://linked.data.gov.au/dataset/asgs2016/stateorterritory/"
 
 S3_BUCKET="loci-assets"
 S3_REGION="ap-southeast-2"
@@ -21,7 +20,7 @@ export PYTHONPATH=$(pwd)
 cd asgs_dataset
 python ./app.py --init
 cd ..
-python ./new_graph_builder.py ${ONLY_TYPE}
+python ./new_graph_builder.py
 
 cd instance
 
