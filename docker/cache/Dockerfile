@@ -21,9 +21,9 @@ ENV JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64"
 ENV GRAPHDB_HOME="/graphdb"
 ENV GRAPHDB_ZIP="${APP_HOME}/graphdb.zip"
 ENV REPO_CONFIG="${APP_HOME}/repo-config.ttl"
-ENV GRAPHDBSOURCE=${GRAPHDBSOURCE:-"${APP_HOME}/cachedata"}
+ENV GRAPHDB_SOURCE=${GRAPHDB_SOURCE:-"${APP_HOME}/cachedata"}
 # Set GraphDB Max and Min Heap size (must be less than available RAM)
-ENV GDB_HEAP_SIZE="8g"
+ENV GDB_HEAP_SIZE="${GDB_HEAP_SIZE:-1g}"
 
 WORKDIR ${APP_HOME}
 
@@ -33,13 +33,13 @@ RUN unzip ${GRAPHDB_ZIP} -d ${APP_HOME}/graphdb && \
     mv ${APP_HOME}/graphdb/graphdb-* ${GRAPHDB_HOME} && \
     rm ${GRAPHDB_ZIP}    
 
-COPY ./graphdb.properties ${GRAPHDB_HOME}/conf/graphdb.properties
-COPY repo-config.ttl ${REPO_CONFIG}
-COPY download-data.sh .
-COPY ./pre-condition-files/* pre-condition-files/
+COPY resources/graphdb.properties ${GRAPHDB_HOME}/conf/graphdb.properties
+COPY resources/repo-config.ttl ${REPO_CONFIG}
+COPY resources/download-data.sh .
+COPY resources/pre-condition-files/* pre-condition-files/
 
 #Build the Cache
-COPY build-cache.sh ${APP_HOME}
+COPY resources/build-cache.sh ${APP_HOME}
 WORKDIR ${APP_HOME}
 EXPOSE 7200
 
