@@ -1,0 +1,8 @@
+version: "3.7"
+
+services:
+    asgs_harvest:
+        environment: 
+            - GRAPH_NAME=http://linked.data.gov.au/dataset/asgs2011
+            - OUTPUT_FILE=${ASGS2011_DATASET_FILE}
+            - BRANCH=asgs2011

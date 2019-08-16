@@ -11,6 +11,13 @@ if [ -z "$S3_PATH" ]; then echo "S3_PATH needs to be set."; exit 1; fi
 
 git clone https://github.com/CSIRO-enviro-informatics/asgs-dataset.git
 cd asgs-dataset
+
+if [ -n "$BRANCH" ] 
+then 
+    git fetch --all
+    git checkout ${BRANCH}
+fi
+
 pip install --no-cache-dir -r requirements.txt
 
 export PYTHONPATH=$(pwd)
