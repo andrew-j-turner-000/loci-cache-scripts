@@ -10,4 +10,5 @@ services:
             - AWS_SECRET_ACCESS_KEY
             - S3_BUCKET
             - S3_REGION
-            - S3_PATH
+            - S3_PATH=${S3_DATASET_PATH}
+            - SINGLE_REGISTER

@@ -9,11 +9,14 @@ if [ -z "$S3_BUCKET" ]; then echo "S3_BUCKET needs to be set."; exit 1; fi
 if [ -z "$S3_REGION" ]; then echo "S3_REGION needs to be set."; exit 1; fi
 if [ -z "$S3_PATH" ]; then echo "S3_PATH needs to be set."; exit 1; fi
 
+env
+
 git clone https://github.com/CSIRO-enviro-informatics/asgs-dataset.git
 cd asgs-dataset
 
 if [ -n "$BRANCH" ] 
 then 
+    echo "Changing branch: ${BRANCH}"
     git fetch --all
     git checkout ${BRANCH}
 fi
@@ -24,7 +27,7 @@ export PYTHONPATH=$(pwd)
 cd asgs_dataset
 python ./app.py --init
 cd ..
-python ./new_graph_builder.py
+python ./new_graph_builder.py ${SINGLE_REGISTER}
 
 cd instance
 
@@ -33,4 +36,4 @@ echo "}" > tail.part
 
 cat head.part *.nt tail.part | gzip -k --rsyncable > ${OUTPUT_FILE}
 
-aws s3 cp ${OUTPUT_FILE} s3://${S3_BUCKET}/${S3_PATH}/${OUTPUT_FILE}
+aws s3 cp ${OUTPUT_FILE} s3://${S3_BUCKET}${S3_PATH}/${OUTPUT_FILE}
