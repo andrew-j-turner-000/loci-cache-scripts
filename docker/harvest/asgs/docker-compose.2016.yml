@@ -1,0 +1,7 @@
+version: "3.7"
+
+services:
+    asgs_harvest:
+        environment: 
+            - GRAPH_NAME=http://linked.data.gov.au/dataset/asgs2016
+            - OUTPUT_FILE=${ASGS2016_DATASET_FILE}

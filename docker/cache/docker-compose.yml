@@ -8,13 +8,17 @@ services:
             dockerfile: Dockerfile
         environment: 
             - GRAPHDB_HOME
-            - GRAPHDBSOURCE
+            - GRAPHDB_SOURCE
+            - FORCE_REFRESH
+            - S3_BUCKET
+            - S3_REGION
+            - S3_LINKSET_PATH
+            - S3_DATASET_PATH
+            - GDB_HEAP_SIZE=8g
         volumes:
-#            - "/etc/localtime:/etc/localtime:ro"
-#            - "/etc/timezone:/etc/timezone:ro"
             - "/tmp:/tmp"
             - "graphdb_data:${GRAPHDB_HOME}"
-            - "data_cache:${GRAPHDBSOURCE}"
+            - "data_cache:${GRAPHDB_SOURCE}"
         ports:
             - "80:7200"
 
