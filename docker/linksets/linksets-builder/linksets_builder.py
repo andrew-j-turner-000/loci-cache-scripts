@@ -67,10 +67,10 @@ def harmonize_crs_albers():
     '''
     logging.info("Harmonizing coordinates to the albers reference system")
     harmonize_crs_sql = """
-    ALTER TABLE public.\"mb:mb\" ADD COLUMN geom_3577 (Geometry,3577);
+    ALTER TABLE public.\"mb:mb\" ADD COLUMN geom_3577 geometry(Geometry,3577);
     UPDATE public.\"mb:mb\" SET geom_3577 = ST_MakeValid(ST_Transform(shape,3577));
     ALTER TABLE public.\"ahgfcontractedcatchment\" ADD COLUMN geom_3577 geometry(Geometry,3577);
-    UPDATE public.\"ahgfcontractedcatchment\" SET geom_3577 = ST_Transform(ST_MakeValid(ST_GeomFromEWKB(shape, 4326)),3577);
+    UPDATE public.\"ahgfcontractedcatchment\" SET geom_3577 = ST_Transform(ST_MakeValid(ST_GeomFromEWKB(shape)),3577);
     """
     run_command(["psql", "--host", "postgis", "--user", "postgres", "-d", "mydb", "-c", harmonize_crs_sql])
 
@@ -191,8 +191,8 @@ def create_classifier_views():
 #load_asgs_mb()
 #get_geofabric_assets()
 #load_geofabric_catchments()
-#harmonize_crs_albers()
-#create_geometry_indexes()
+harmonize_crs_albers()
+create_geometry_indexes()
 create_intersections()
 create_intersections_areas()
 find_bad_meshblocks()
