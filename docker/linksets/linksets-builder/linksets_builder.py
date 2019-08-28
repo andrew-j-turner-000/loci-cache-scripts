@@ -6,8 +6,13 @@ import logging
 import boto3
 from botocore import UNSIGNED
 from botocore.client import Config
-
+import os
 logging.basicConfig(level=logging.DEBUG)
+
+s3_bucket = os.getenv('S3_BUCKET')
+s3_source_data_path = os.getenv('S3_SOURCE_DATA_PATH')
+s3_geofabric_path = os.getenv('S3_GEOFABRIC_PATH')
+asgs_mb_wfs_url = os.getenv('ASGS_MB_WFS_URL')
 
 def run_command(command_line_array):
     '''
@@ -37,7 +42,7 @@ def load_asgs_mb():
     '''
     logging.info("Loading asgs meshblocks")
     run_command(["ogr2ogr", "-f", "PostgreSQL", "PG:host=postgis port=5432 dbname=mydb user=postgres password=password", 
-        "WFS:https://geo.abs.gov.au/arcgis/services/ASGS2016/MB/MapServer/WFSServer", "-skipfailures", "-overwrite", "-progress", "-nlt",
+        "WFS:{}".format(asgs_mb_wfs_url), "-skipfailures", "-overwrite", "-progress", "-nlt",
         "MULTIPOLYGON", "--config", "PG_USE_COPY", "YES"])
 
 def get_geofabric_assets():
@@ -45,7 +50,7 @@ def get_geofabric_assets():
     if not os.path.exists('../assets'):
         os.makedirs('../assets')
     if not os.path.exists('../assets/HR_Catchments_GDB_V2_1_1.zip'):
-        run_command(['aws', 's3', 'cp', 's3://loci-assets/source-data/geofabric_2-1/HR_Catchments_GDB_V2_1_1.zip', '../assets/', '--no-sign-request'])
+        run_command(['aws', 's3', 'cp', 's3://{}{}{}'.format(s3_bucket, s3_source_data_path, s3_geofabric_path), '../assets/', '--no-sign-request'])
         with zipfile.ZipFile('../assets/HR_Catchments_GDB_V2_1_1.zip', 'r') as zip_ref:
             zip_ref.extractall('../assets')
 
@@ -187,13 +192,14 @@ def create_classifier_views():
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_classifier_views_sql])
 
-#prepare_database()
-#load_asgs_mb()
-#get_geofabric_assets()
-#load_geofabric_catchments()
-harmonize_crs_albers()
-create_geometry_indexes()
-create_intersections()
-create_intersections_areas()
-find_bad_meshblocks()
-create_classifier_views()
+if __name__ == "__main__":
+    prepare_database()
+    load_asgs_mb()
+    get_geofabric_assets()
+    load_geofabric_catchments()
+    harmonize_crs_albers()
+    create_geometry_indexes()
+    create_intersections()
+    create_intersections_areas()
+    find_bad_meshblocks()
+    create_classifier_views()

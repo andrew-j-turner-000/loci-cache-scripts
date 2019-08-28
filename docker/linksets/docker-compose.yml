@@ -5,12 +5,19 @@ services:
     build: 
       context: linksets-builder 
       target: python-specific
-
+    env_file:
+      - ./.env
+    environment:
+      - S3_BUCKET
+      - S3_REGION
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
     volumes:
       - ..:/app
     links: 
       - postgis
     command: /bin/sh -c 'tail -f /dev/null'
+    #command: /bin/sh -c 'cd /app/linksets/linksets-builder && python linksets_builder.py && python linksets_triples_builder.py'
 
   postgis:
     image: mdillon/postgis:11
