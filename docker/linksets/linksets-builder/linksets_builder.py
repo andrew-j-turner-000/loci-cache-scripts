@@ -6,13 +6,14 @@ import logging
 import boto3
 from botocore import UNSIGNED
 from botocore.client import Config
+import utils
 import os
 logging.basicConfig(level=logging.DEBUG)
 
-s3_bucket = os.getenv('S3_BUCKET')
-s3_source_data_path = os.getenv('S3_SOURCE_DATA_PATH')
-s3_geofabric_path = os.getenv('S3_GEOFABRIC_PATH')
-asgs_mb_wfs_url = os.getenv('ASGS_MB_WFS_URL')
+s3_bucket = utils.fail_or_getenv('S3_BUCKET')
+s3_source_data_path = utils.fail_or_getenv('S3_SOURCE_DATA_PATH')
+s3_geofabric_path = utils.fail_or_getenv('S3_GEOFABRIC_PATH')
+asgs_mb_wfs_url = utils.fail_or_getenv('ASGS_MB_WFS_URL')
 
 def run_command(command_line_array):
     '''
