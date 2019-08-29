@@ -21,5 +21,6 @@ services:
 
   postgis:
     image: mdillon/postgis:11
+    shm_size: 8g 
     ports:
       - 5432:5432
