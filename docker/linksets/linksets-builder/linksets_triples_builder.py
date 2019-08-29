@@ -4,6 +4,8 @@ import utils
 from datetime import datetime
 import logging
 import fileinput
+from io import StringIO
+
 logging.basicConfig(level=logging.DEBUG)
 
 database_url = utils.fail_or_getenv('DATABASE_URL')
@@ -119,20 +121,21 @@ def do_overlaps():
     logging.info("Generating overlaps statements")
     con = pg.connect("host={} port=5432 dbname=mydb user=postgres password=password".format(database_url))
     cur = con.cursor("cur1")
-    cur.execute("""\
+    command = """\
     SELECT mb.mb_code_2016, cc.hydroid, mb.mb_area, cc.cc_area, mb.i_area, mb.is_overlaps, cc.is_overlaps, mb.is_within, cc.is_within 
-    FROM public."mbintersectccareas_classify" as mb
-    INNER JOIN public."ccintersectmbareas_classify" as cc on mb.mb_code_2016 = cc.mb_code_2016 and mb.hydroid = cc.hydroid
-    WHERE (mb.is_overlaps or cc.is_overlaps) and (not mb.is_within) and (not cc.is_within);
-    -- LIMIT 10;
+    FROM public.\"mbintersectccareas_classify\" as mb
+    INNER JOIN public.\"ccintersectmbareas_classify\" as cc on mb.mb_code_2016 = cc.mb_code_2016 and mb.hydroid = cc.hydroid
+    WHERE (mb.is_overlaps or cc.is_overlaps) and (not mb.is_within) and (not cc.is_within)
     -- ORDER BY mb.mb_code_2016;
-    """)
+    """
     c = 0
     intersection_iter = 0
     expressed_mb_areas = set()
     expressed_cc_areas = set()
+    file_like = StringIO()
+    cur.copy_expert("COPY ({}) TO STDOUT WITH CSV".format(command), file_like, size=32000)
     with open("overlaps_all.ttl", "w") as outfile:
-        for record in cur:
+        for record in file_like.readlines():
             intersection_iter += 1
             c += 1
             mb_code_2016 = str(record[0])
@@ -157,18 +160,18 @@ def do_withins():
     logging.info("Generating withins statements")
     con = pg.connect("host={} dbname=mydb user=postgres password=password".format(database_url))
     cur = con.cursor("cur2")
-    cur.execute("""\
+    command = """\
     SELECT mb.mb_code_2016, cc.hydroid, mb.is_within, cc.is_within
-    FROM public."mbintersectccareas_classify" as mb
-    INNER JOIN public."ccintersectmbareas_classify" as cc on mb.mb_code_2016 = cc.mb_code_2016 and mb.hydroid = cc.hydroid
-    WHERE mb.is_within or cc.is_within;
-    -- LIMIT 10;
-    -- ORDER BY mb.mb_code_2016;
-    """)
+    FROM public.\"mbintersectccareas_classify\" as mb
+    INNER JOIN public.\"ccintersectmbareas_classify\" as cc on mb.mb_code_2016 = cc.mb_code_2016 and mb.hydroid = cc.hydroid
+    WHERE mb.is_within or cc.is_within 
+    """
     c = 0
     within_iter = 0
+    file_like = StringIO()
+    cur.copy_expert("COPY ({}) TO STDOUT WITH CSV".format(command), file_like, size=32000)
     with open("within_all.ttl", "w") as outfile:
-        for record in cur:
+        for record in file_like.readlines():
             c+=1
             within_iter += 1
             mb_code_2016 = str(record[0])
