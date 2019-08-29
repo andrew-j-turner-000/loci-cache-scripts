@@ -136,7 +136,8 @@ def do_overlaps():
     cur.copy_expert("COPY ({}) TO STDOUT WITH CSV".format(command), file_like, size=32000)
     file_like.seek(0)
     with open("overlaps_all.ttl", "w") as outfile:
-        for record in file_like.readlines():
+        for line in file_like.readlines():
+            record = line.split(',')
             intersection_iter += 1
             c += 1
             mb_code_2016 = str(record[0])
@@ -173,7 +174,8 @@ def do_withins():
     cur.copy_expert("COPY ({}) TO STDOUT WITH CSV".format(command), file_like, size=32000)
     file_like.seek(0)
     with open("within_all.ttl", "w") as outfile:
-        for record in file_like.readlines():
+        for line in file_like.readlines():
+            record = line.split(',')
             c+=1
             within_iter += 1
             mb_code_2016 = str(record[0])
