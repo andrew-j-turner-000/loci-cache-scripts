@@ -41,6 +41,9 @@ if [ -z "$(ls -A $GRAPHDB_SOURCE)" ] || [ -n "${FORCE_REFRESH}" ]; then
     echo "GraphDB started"
 
     #Loop precondition file and send to graphql
+    #Might be worth looking to use parallel or xargs to run these in parallel, graphdb appear to be only using
+    # 1cpu per request. AWS box has 4. Something like:
+    # xargs -n1 -P4 bash -c 'i=$0; url="http://example.com/?page${i}.html"; curl -O -s $url'
     for filename in ${APP_HOME}/pre-condition-files/*.sparql; do
         curl -X POST ${STATEMENTS_ENDPOINT} -H "Content-Type: application/x-www-form-urlencoded" -H "Accept: application/sparql-results+json" --data-urlencode "update@$filename"
     done

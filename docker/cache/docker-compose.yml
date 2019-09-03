@@ -10,11 +10,9 @@ services:
             - GRAPHDB_HOME
             - GRAPHDB_SOURCE
             - FORCE_REFRESH
-            - S3_BUCKET
-            - S3_REGION
-            - S3_LINKSET_PATH
-            - S3_DATASET_PATH
             - GDB_HEAP_SIZE=8g
+        env_file:
+            - ../../common/common.env
         volumes:
             - "/tmp:/tmp"
             - "graphdb_data:${GRAPHDB_HOME}"

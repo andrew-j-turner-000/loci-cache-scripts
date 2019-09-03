@@ -33,7 +33,9 @@ wget --header="Accept: text/turtle" http://linked.data.gov.au/def/asgs -O asgs.o
 wget --header="Accept: text/turtle" http://linked.data.gov.au/def/gnaf -O gnaf.ont.ttl
 # wget --header="Accept: text/turtle" https://raw.githubusercontent.com/AGLDWG/gnaf-ont/master/gnaf.ttl -O gnaf.ont.ttl
 # wget "https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/gnaf.ttl" -O gnaf.ont.ttl
+# wget --header="Accept: text/turtle" http://linked.data.gov.au/def/geofabric -O geofabric.ont.ttl
 wget --header="Accept: text/turtle" http://linked.data.gov.au/def/geofabric -O geofabric.ont.ttl
+
 # wget --header="Accept: text/turtle" https://raw.githubusercontent.com/CSIRO-enviro-informatics/geofabric-ont/master/geofabric.ttl -O gnaf.ont.ttl
 # wget "https://loci-assets.s3-ap-southeast-2.amazonaws.com/ontologies/loci-lite/geofabric.ttl" -O geofabric.ont.ttl
 wget "https://www.opengis.net/def/appschema/hy_features/hyf/hyf.ttl" -O hy_features.ont.ttl
