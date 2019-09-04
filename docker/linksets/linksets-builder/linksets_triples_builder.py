@@ -180,8 +180,8 @@ def do_withins():
             within_iter += 1
             mb_code_2016 = str(record[0])
             hydroid = str(record[1])
-            mb_is_within = bool(record[2])
-            cc_is_within = bool(record[3])
+            mb_is_within = (str(record[2]).lower().startswith("t")) 
+            cc_is_within = (str(record[3]).lower().startswith("t")) 
             if mb_is_within:
                 next_chunk = mb_sf_within_template.format(mb_code_2016=mb_code_2016, hydroid=hydroid, within_iter=within_iter)
             else:
