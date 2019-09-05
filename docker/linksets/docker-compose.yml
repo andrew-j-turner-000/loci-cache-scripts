@@ -3,7 +3,7 @@ version: '3.4'
 services:
   linksets:
     build: 
-      context: linksets-builder 
+      context: mb2cc
       target: python-specific
     env_file:
       - ../../common/common.env
