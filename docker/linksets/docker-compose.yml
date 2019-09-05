@@ -6,7 +6,7 @@ services:
       context: linksets-builder 
       target: python-specific
     env_file:
-      - ../../common.env
+      - ../../common/common.env
     environment:
       - S3_BUCKET
       - S3_REGION
