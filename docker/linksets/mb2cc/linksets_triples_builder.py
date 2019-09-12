@@ -77,57 +77,57 @@ _:contact a vcard:Individual ;
 
 
 mb_area_template = """\
-mb:{mb_code_2016:s} a f: ;
+mb:{{from_id_column}16:s} a f: ;
  am2: [ dv: "{mb_area_m2:f}"^^dc: ; crs: albers: ] .
 """
 cc_area_template = """\
-cc:{hydroid:s} a f: ;
+cc:{{to_id_column}:s} a f: ;
  am2: [ dv: "{cc_area_m2:f}"^^dc: ; crs: albers: ] .
 """
 overlaps_template = """\
 :i{intersection_iter:d} a f: ;
  am2: [ dv: "{i_area_m2:f}"^^dc: ; crs: albers: ] .
-:mo{intersection_iter:d} s: mb:{mb_code_2016:s} ;
+:mo{intersection_iter:d} s: mb:{{from_id_column}16:s} ;
  p: c: ;
  o: :i{intersection_iter:d} ;
  i: l: ;
  m: _:mb16cc_p .
-:co{intersection_iter:d} s: cc:{hydroid:s} ;
+:co{intersection_iter:d} s: cc:{{to_id_column}:s} ;
  p: c: ;
  o: :i{intersection_iter:d} ;
  i: l: ;
  m: _:mb16cc_p .
-:to{intersection_iter:d} s: mb:{mb_code_2016:s} ;
+:to{intersection_iter:d} s: mb:{{from_id_column}16:s} ;
  p: tso: ;
- o: cc:{hydroid:s};
+ o: cc:{{to_id_column}:s};
  i: l: ;
  m: _:mb16cc_p .
 """
 mb_sf_within_template = """\
-:mw{within_iter:d} s: mb:{mb_code_2016:s} ;
+:mw{within_iter:d} s: mb:{{from_id_column}16:s} ;
  p: w: ;
- o: cc:{hydroid:s} ;
+ o: cc:{{to_id_column}:s} ;
  i: l: ;
  m: _:mb16cc_p .
 """
 mb_sf_contains_template = """\
-:mc{within_iter:d} s: mb:{mb_code_2016:s} ;
+:mc{within_iter:d} s: mb:{{from_id_column}16:s} ;
  p: c: ;
- o: cc:{hydroid:s} ;
+ o: cc:{{to_id_column}:s} ;
  i: l: ;
  m: _:mb16cc_p .
 """
-def do_overlaps():
+def do_overlaps(from_id_column, to_id_column):
     logging.info("Generating overlaps statements")
     con = pg.connect("host={} port=5432 dbname=mydb user=postgres password=password".format(database_url))
     cur = con.cursor("cur1")
     command = """\
-    SELECT mb.mb_code_20, cc.hydroid, mb.mb_area, cc.cc_area, mb.i_area, mb.is_overlaps, cc.is_overlaps, mb.is_within, cc.is_within 
-    FROM public.\"mbintersectccareas_classify\" as mb
-    INNER JOIN public.\"ccintersectmbareas_classify\" as cc on mb.mb_code_20 = cc.mb_code_20 and mb.hydroid = cc.hydroid
-    WHERE (mb.is_overlaps or cc.is_overlaps) and (not mb.is_within) and (not cc.is_within)
-    -- ORDER BY mb.mb_code_20;
-    """
+    SELECT from.{from_id_column}, to.{to_id_column}, from.mb_area, to.cc_area, from.i_area, from.is_overlaps, to.is_overlaps, from.is_within, to.is_within 
+    FROM public.\"fromintersecttoareas_classify\" as to 
+    INNER JOIN public.\"tointersectfromareas_classify\" as from on from.{from_id_column} = to.{from_id_column} and from.{to_id_column} = to.{to_id_column}
+    WHERE (from.is_overlaps or to.is_overlaps) and (not from.is_within) and (not to.is_within)
+    -- ORDER BY from.{from_id_column};
+    """.format(from_id_column=from_id_column, to_id_column=to_id_column)
     c = 0
     intersection_iter = 0
     expressed_mb_areas = set()
@@ -140,34 +140,36 @@ def do_overlaps():
             record = line.split(',')
             intersection_iter += 1
             c += 1
-            mb_code_2016 = str(record[0])
-            hydroid = str(record[1])
+            {from_id_column = str(record[0])
+            {to_id_column} = str(record[1])
             mb_area_m2 = float(record[2])
             cc_area_m2 = float(record[3])
             i_area_m2  = float(record[4])
             mb_area_m2 = round((mb_area_m2 / 100.0), 7) * 100.0
             cc_area_m2 = round((cc_area_m2 / 100.0), 7) * 100.0
             i_area_m2  = round((i_area_m2  / 100.0), 7) * 100.0
-            if mb_code_2016 not in expressed_mb_areas:
-                mb_area_chunk = mb_area_template.format(mb_code_2016=mb_code_2016, mb_area_m2=mb_area_m2)
+            if {from_id_column not in expressed_mb_areas:
+                mb_area_chunk = mb_area_template.format({from_id_column={from_id_column, mb_area_m2=mb_area_m2)
                 outfile.write(mb_area_chunk)
-                expressed_mb_areas.add(mb_code_2016)
-            if hydroid not in expressed_cc_areas:
-                cc_area_chunk = cc_area_template.format(hydroid=hydroid, cc_area_m2=cc_area_m2)
+                expressed_mb_areas.add({from_id_column)
+            if {to_id_column} not in expressed_cc_areas:
+                cc_area_chunk = cc_area_template.format({to_id_column}={to_id_column}, cc_area_m2=cc_area_m2)
                 outfile.write(cc_area_chunk)
-                expressed_cc_areas.add(hydroid)
-            next_chunk = overlaps_template.format(mb_code_2016=mb_code_2016, hydroid=hydroid, intersection_iter=intersection_iter, i_area_m2=i_area_m2)
+                expressed_cc_areas.add({to_id_column})
+            next_chunk = overlaps_template.format({from_id_column={from_id_column, {to_id_column}={to_id_column}, intersection_iter=intersection_iter, i_area_m2=i_area_m2)
             outfile.write(next_chunk)
-def do_withins():
+            
+            
+def do_withins(from_id_column, to_id_column):
     logging.info("Generating withins statements")
     con = pg.connect("host={} dbname=mydb user=postgres password=password".format(database_url))
     cur = con.cursor("cur2")
     command = """\
-    SELECT mb.mb_code_20, cc.hydroid, mb.is_within, cc.is_within
-    FROM public.\"mbintersectccareas_classify\" as mb
-    INNER JOIN public.\"ccintersectmbareas_classify\" as cc on mb.mb_code_20 = cc.mb_code_20 and mb.hydroid = cc.hydroid
-    WHERE mb.is_within or cc.is_within
-    """
+    SELECT from.{from_id_column}, to.{to_id_column}, from.is_within, to.is_within
+    FROM public.\"fromintersecttoareas_classify\" as from 
+    INNER JOIN public.\"tointersectfromareas_classify\" as to on from.{from_id_column} = to.{from_id_column} and from.{to_id_column} = to.{to_id_column}
+    WHERE from.is_within or to.is_within
+    """.format(from_id_column=from_id_column, to_id_column=to_id_column)
     c = 0
     within_iter = 0
     file_like = StringIO()
@@ -178,14 +180,14 @@ def do_withins():
             record = line.split(',')
             c+=1
             within_iter += 1
-            mb_code_2016 = str(record[0])
-            hydroid = str(record[1])
+            {from_id_column} = str(record[0])
+            {to_id_column} = str(record[1])
             mb_is_within = (str(record[2]).lower().startswith("t")) 
             cc_is_within = (str(record[3]).lower().startswith("t")) 
             if mb_is_within:
-                next_chunk = mb_sf_within_template.format(mb_code_2016=mb_code_2016, hydroid=hydroid, within_iter=within_iter)
+                next_chunk = mb_sf_within_template.format({from_id_column={from_id_column, {to_id_column}={to_id_column}, within_iter=within_iter)
             else:
-                next_chunk = mb_sf_contains_template.format(mb_code_2016=mb_code_2016, hydroid=hydroid, within_iter=within_iter)
+                next_chunk = mb_sf_contains_template.format({from_id_column={from_id_column, {to_id_column}={to_id_column}, within_iter=within_iter)
             outfile.write(next_chunk)
 
 def generate_header():
@@ -196,12 +198,14 @@ def generate_header():
 
 def concat_files():
     logging.info("Concatenating headers withins overlaps into compiled linkset file")
-    with open('ls_mb16cc.ttl', 'w') as fout, fileinput.input(['./header.ttl', './within_all.ttl', './overlaps_all.ttl']) as fin:
+    with open('ls_mb16to.ttl', 'w') as fout, fileinput.input(['./header.ttl', './within_all.ttl', './overlaps_all.ttl']) as fin:
         for line in fin:
             fout.write(line)
 
 if __name__ == "__main__":
-    do_withins()
-    do_overlaps()
+    to_id_column = "hydroid"
+    from_id_column = "mb_code_20"
+    do_withins(from_id_column, to_id_column)
+    do_overlaps(from_id_column, to_id_column)
     generate_header()
     concat_files()
