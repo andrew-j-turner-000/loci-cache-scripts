@@ -1,7 +1,7 @@
 import os
 import subprocess
 import logging
-
+logging.basicConfig(level=logging.DEBUG)
 
 def run_command(command_line_array):
     '''

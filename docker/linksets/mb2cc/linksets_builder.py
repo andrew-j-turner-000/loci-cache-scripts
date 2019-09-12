@@ -11,6 +11,9 @@ s3_source_data_path = utils.fail_or_getenv('S3_SOURCE_DATA_PATH')
 s3_geofabric_path = utils.fail_or_getenv('S3_GEOFABRIC_PATH')
 s3_asgs_2016_mb_path = utils.fail_or_getenv('S3_ASGS_2016_MB_PATH')
 asgs_mb_wfs_url = utils.fail_or_getenv('ASGS_MB_WFS_URL')
+# check that AWS keys are defined for command line aws s3 calls
+utils.fail_or_getenv('AWS_ACCESS_KEY_ID')
+utils.fail_or_getenv('AWS_SECRET_ACCESS_KEY')
 asgs_2016_local_name_prefix = "mb_2016_all_shape"
 
 
@@ -62,10 +65,9 @@ def get_s3_assets(local_file_name_save_to, s3_bucket, s3_path):
     '''
     if not os.path.exists('../assets'):
         os.makedirs('../assets')
-    if not os.path.exists('../assets/{}'.format(local_file_name_save_to)):
-        run_command(['aws', 's3', 'cp', 's3://{}{}'.format(s3_bucket, s3_path), '../assets/', '--no-sign-request'])
-        with zipfile.ZipFile('../assets/{}.zip'.format(local_file_name_save_to), 'r') as zip_ref:
-            zip_ref.extractall('../assets')
+    run_command(['aws', 's3', 'cp', 's3://{}{}'.format(s3_bucket, s3_path), '../assets/'])
+    with zipfile.ZipFile('../assets/{}.zip'.format(local_file_name_save_to), 'r') as zip_ref:
+        zip_ref.extractall('../assets')
 
 
 def get_geofabric_assets():
