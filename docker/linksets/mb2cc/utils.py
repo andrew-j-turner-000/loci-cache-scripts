@@ -8,7 +8,7 @@ def run_command(command_line_array):
     Utility for running commands and logging outputs
     '''
     output = ''
-    logging.debug(command_line_array)
+    logging.debug(' '.join(command_line_array))
     output = subprocess.check_output(command_line_array, universal_newlines=True)
     logging.info(output)
 

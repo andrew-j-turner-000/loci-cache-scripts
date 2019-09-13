@@ -17,7 +17,7 @@ utils.fail_or_getenv('AWS_SECRET_ACCESS_KEY')
 asgs_2016_local_name_prefix = "mb_2016_all_shape"
 
 
-def load_via_ogr(source_data, target_table_name, define_target_geometry_type='MULTIPOLYGON', limit=LIMIT_LOAD):
+def load_via_ogr(source_data, target_table_name, source_data_table=None, define_target_geometry_type='MULTIPOLYGON', limit=LIMIT_LOAD):
     '''
     Loads spatial data into postgis
     :param source_data: source data for ogr2ogr to load into postgres
@@ -32,8 +32,12 @@ def load_via_ogr(source_data, target_table_name, define_target_geometry_type='MU
     if define_target_geometry_type is not None:
         target_geometry_args = ["-nlt", define_target_geometry_type]
 
+    source_data_table_args = []
+    if source_data_table is not None:
+        source_data_table_args = [source_data_table]
+
     run_command(["ogr2ogr", "-f", "PostgreSQL", "PG:host=postgis port=5432 dbname=mydb user=postgres password=password",
-                source_data, "-skipfailures", "-overwrite", "-progress", "-nln", target_table_name, "-lco", "geom_3577", "-t_trs", "EPSG:3577"] + target_geometry_args + limit_args + ["--config", "PG_USE_COPY", "YES"])
+                source_data, "-skipfailures", "-overwrite", "-progress", "-nln", target_table_name] + source_data_table_args + ["-lco", "GEOMETRY_NAME=geom_3577", "-lco", "PRECISION=NO", "-t_srs", "EPSG:3577"] + target_geometry_args + limit_args + ["--config", "PG_USE_COPY", "YES"])
 
 
 def prepare_database():
@@ -76,7 +80,7 @@ def load_geofabric_catchments():
     eg: ST_GeomFromWKB(shape, 4326). Then we need to convert it to albers (EPSG:3577) in order to do constant-area intersections with meshblocks.
     '''
     logging.info("Loading geofabric catchments")
-    load_via_ogr("../assets/HR_Catchments_GDB/HR_Catchments.gdb", "to", define_target_geometry_type=None)
+    load_via_ogr("../assets/HR_Catchments_GDB/HR_Catchments.gdb", "to", source_data_table="AHGFContractedCatchment", define_target_geometry_type=None)
     to_id_column = "hydroid"
     return to_id_column
 
@@ -116,39 +120,24 @@ def create_intersections(from_id_column, to_id_column):
     logging.info("Calculating intersecting from and to")
     create_intersection_sql = """
     CREATE MATERIALIZED VIEW fromintersectto_mv AS
-    SELECT from.{from_id_column}, to.{to_id_column}, ST_Intersection(from.geom_3577, to.geom_3577) as i
-    FROM public.\"to\" as to 
-    INNER JOIN public.\"from\" as mb ON from.geom_3577 && to.geom_3577 -- the && specifies an indexed bounding box lookup
-    WHERE ST_IsValid(to.geom_3577) AND ST_IsValid(from.geom_3577) AND ST_Intersects(from.geom_3577, to.geom_3577)
-    ORDER BY from.{from_id_column} ASC;
+    SELECT from_t.\"{from_id_column}\", to_t.\"{to_id_column}\", ST_Intersection(from_t.geom_3577, to_t.geom_3577) as i
+    FROM public.\"to\" as to_t 
+    INNER JOIN public.\"from\" as from_t ON from_t.geom_3577 && to_t.geom_3577 -- the && specifies an indexed bounding box lookup
+    WHERE ST_IsValid(to_t.geom_3577) AND ST_IsValid(from_t.geom_3577) AND ST_Intersects(from_t.geom_3577, to_t.geom_3577)
+    ORDER BY from_t.\"{from_id_column}\" ASC;
     CREATE MATERIALIZED VIEW tointersectfrom_mv AS
-    SELECT to.{to_id_column}, from.{from_id_column}, ST_Intersection(to.geom_3577, from.geom_3577) as i
-    FROM public.\"from\" as from 
-    INNER JOIN public.\"to\" as ca ON to.geom_3577 && from.geom_3577 -- the && specifies an indexed bounding box lookup
-    WHERE ST_IsValid(to.geom_3577) AND ST_IsValid(from.geom_3577) AND ST_Intersects(to.geom_3577, from.geom_3577)
-    ORDER BY to.{to_id_column} ASC;
+    SELECT to_t.\"{to_id_column}\", from_t.\"{from_id_column}\", ST_Intersection(to_t.geom_3577, from_t.geom_3577) as i
+    FROM public.\"from\" as from_t
+    INNER JOIN public.\"to\" as to_t ON to_t.geom_3577 && from_t.geom_3577 -- the && specifies an indexed bounding box lookup
+    WHERE ST_IsValid(to_t.geom_3577) AND ST_IsValid(from_t.geom_3577) AND ST_Intersects(to_t.geom_3577, from_t.geom_3577)
+    ORDER BY to_t.\"{to_id_column}\" ASC;
     """.format(from_id_column=from_id_column, to_id_column=to_id_column)
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_intersection_sql])
 
-def create_indexes(from_id_column, to_id_column):
-    '''
-    Create indexes for performance
-    :param from_id_column: name of a column containing a unique key in the from geospatial table it will be used for suffixing identifiers later 
-    :param to_id_column: name of a column containing a unique key in the to geospatial table it will be used for suffixing identifiers later 
-    '''
-    logging.info("Creating Geometry Indexes")
-    create_indexes_sql = """
-    CREATE INDEX fromintersects_from_id_idx ON public.\"fromintersecttoareas\" USING GIST ({from_id_column});
-    CREATE INDEX fromintersects_to_id_idx ON public.\"tointersectsfromareas\" USING GIST ({to_id_column});
-    CREATE INDEX _from_code_idx ON public.\"fromintersectto_mv\" USING GIST ({from_id_column});
-    CREATE INDEX fromintersects_to_id_idx ON public.\"fromintersectto_mv\" USING GIST ({to_id_column});
-    """.format(from_id_column=from_id_column, to_id_column=to_id_column)
-    run_command(["psql", "--host", "postgis", "--user",
-                 "postgres", "-d", "mydb", "-c", create_indexes_sql])
 
 
-def create_intersections_areas():
+def create_intersections_areas(from_id_column, to_id_column):
     """
     Calculates intersecting areas
     :param from_id_column: name of a column containing a unique key in the from geospatial table it will be used for suffixing identifiers later 
@@ -157,33 +146,33 @@ def create_intersections_areas():
     logging.info("Calculating intersecting area for from and to")
     create_intersection_areas_sql = """
     CREATE VIEW fromintersecttoareas AS
-    SELECT s.{from_id_column}, s.{to_id_column}, s.from_area, s.to_area, s.i_area, (s.i_area / s.from_area) as from_proportion, (s.i_area / s.to_area) as to_proportion, s.geomcollection FROM (
-    SELECT mv.{from_id_column},
-           mv.{to_id_column},
-           ST_Area(from.geom_3577)                         as from_area,
-           ST_Area(to.geom_3577)                         as to_area,
+    SELECT s.\"{from_id_column}\", s.\"{to_id_column}\", s.from_area, s.to_area, s.i_area, (s.i_area / s.from_area) as from_proportion, (s.i_area / s.to_area) as to_proportion, s.geomcollection FROM (
+    SELECT mv.\"{from_id_column}\",
+           mv.\"{to_id_column}\",
+           ST_Area(from_t.geom_3577)                         as from_area,
+           ST_Area(to_t.geom_3577)                         as to_area,
            ST_Area(mv.i)                                 as i_area,
-           ST_Collect(ARRAY[to.geom_3577, from.geom_3577, mv.i]) as geomcollection
+           ST_Collect(ARRAY[to_t.geom_3577, from_t.geom_3577, mv.i]) as geomcollection
     FROM fromintersectto_mv as mv
-    INNER JOIN public.\"from\" as from ON from.{from_id_column} = mv.{from_id_column}
-    INNER JOIN public.\"to\" as to ON to.{to_id_column} = mv.{to_id_column}
+    INNER JOIN public.\"from\" as from_t ON from_t.\"{from_id_column}\" = mv.\"{from_id_column}\"
+    INNER JOIN public.\"to\" as to_t ON to_t.\"{to_id_column}\" = mv.\"{to_id_column}\"
     ) as s;
     CREATE VIEW tointersectfromareas AS
-    SELECT s.{to_id_column}, s.{from_id_column}, s.to_area, s.from_area, s.i_area, (s.i_area / s.to_area) as to_proportion, (s.i_area / s.from_area) as from_proportion, s.geomcollection FROM (
-    SELECT mv.{to_id_column},
-           mv.{from_id_column},
-           ST_Area(to.geom_3577)                         as to_area,
-           ST_Area(from.geom_3577)                         as from_area,
+    SELECT s.\"{to_id_column}\", s.\"{from_id_column}\", s.to_area, s.from_area, s.i_area, (s.i_area / s.to_area) as to_proportion, (s.i_area / s.from_area) as from_proportion, s.geomcollection FROM (
+    SELECT mv.\"{to_id_column}\",
+           mv.\"{from_id_column}\",
+           ST_Area(to_t.geom_3577)                         as to_area,
+           ST_Area(from_t.geom_3577)                         as from_area,
            ST_Area(mv.i)                                 as i_area,
-           ST_Collect(ARRAY[from.geom_3577, to.geom_3577, mv.i]) as geomcollection
+           ST_Collect(ARRAY[from_t.geom_3577, to_t.geom_3577, mv.i]) as geomcollection
     FROM tointersectfrom_mv as mv
-    INNER JOIN public.\"to\" as to ON to.{to_id_column} = mv.{to_id_column}
-    INNER JOIN public.\"from\" as from ON from.{from_id_column} = mv.{from_id_column}
+    INNER JOIN public.\"to\" as to_t ON to_t.\"{to_id_column}\" = mv.\"{to_id_column}\"
+    INNER JOIN public.\"from\" as from_t ON from_t.\"{from_id_column}\" = mv.\"{from_id_column}\"
     ) as s;
     """.format(from_id_column=from_id_column, to_id_column=to_id_column)
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_intersection_areas_sql])
-
+#
 
 def create_classifier_views():
     '''
@@ -193,11 +182,11 @@ def create_classifier_views():
     logging.info("Classifying ambiguous overlapping meshblocks thresholds")
     create_classifier_views_sql = """
     CREATE VIEW fromintersecttoareas_classify AS
-    SELECT from.*, from_proportion >= 0.010 as is_overlaps, from_proportion >=0.990 as is_within
-    FROM fromintersecttoareas as from;
+    SELECT from_t.*, from_t.from_proportion >= 0.010 as is_overlaps, from_t.from_proportion >=0.990 as is_within
+    FROM fromintersecttoareas as from_t;
     CREATE VIEW tointersectfromareas_classify AS
-    SELECT to.*, to_proportion >= 0.010 as is_overlaps, to_proportion >=0.990 as is_within
-    FROM tointersectfromareas as cc;
+    SELECT to_t.*, to_t.to_proportion >= 0.010 as is_overlaps, to_t.to_proportion >=0.990 as is_within
+    FROM tointersectfromareas as to_t;
     """
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_classifier_views_sql])
@@ -216,7 +205,6 @@ if __name__ == "__main__":
     to_id_column = load_to_data()
 
     # Generic linksets builder logic
-    create_indexes(from_id_column, to_id_column)
     create_geometry_indexes()
     create_intersections(from_id_column, to_id_column)
     create_intersections_areas(from_id_column, to_id_column)
