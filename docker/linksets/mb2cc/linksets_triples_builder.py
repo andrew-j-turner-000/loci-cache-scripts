@@ -122,11 +122,11 @@ def do_overlaps():
     con = pg.connect("host={} port=5432 dbname=mydb user=postgres password=password".format(database_url))
     cur = con.cursor("cur1")
     command = """\
-    SELECT mb.mb_code_2016, cc.hydroid, mb.mb_area, cc.cc_area, mb.i_area, mb.is_overlaps, cc.is_overlaps, mb.is_within, cc.is_within 
+    SELECT mb.mb_code_20, cc.hydroid, mb.mb_area, cc.cc_area, mb.i_area, mb.is_overlaps, cc.is_overlaps, mb.is_within, cc.is_within 
     FROM public.\"mbintersectccareas_classify\" as mb
-    INNER JOIN public.\"ccintersectmbareas_classify\" as cc on mb.mb_code_2016 = cc.mb_code_2016 and mb.hydroid = cc.hydroid
+    INNER JOIN public.\"ccintersectmbareas_classify\" as cc on mb.mb_code_20 = cc.mb_code_20 and mb.hydroid = cc.hydroid
     WHERE (mb.is_overlaps or cc.is_overlaps) and (not mb.is_within) and (not cc.is_within)
-    -- ORDER BY mb.mb_code_2016;
+    -- ORDER BY mb.mb_code_20;
     """
     c = 0
     intersection_iter = 0
@@ -163,9 +163,9 @@ def do_withins():
     con = pg.connect("host={} dbname=mydb user=postgres password=password".format(database_url))
     cur = con.cursor("cur2")
     command = """\
-    SELECT mb.mb_code_2016, cc.hydroid, mb.is_within, cc.is_within
+    SELECT mb.mb_code_20, cc.hydroid, mb.is_within, cc.is_within
     FROM public.\"mbintersectccareas_classify\" as mb
-    INNER JOIN public.\"ccintersectmbareas_classify\" as cc on mb.mb_code_2016 = cc.mb_code_2016 and mb.hydroid = cc.hydroid
+    INNER JOIN public.\"ccintersectmbareas_classify\" as cc on mb.mb_code_20 = cc.mb_code_20 and mb.hydroid = cc.hydroid
     WHERE mb.is_within or cc.is_within
     """
     c = 0
