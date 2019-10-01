@@ -45,7 +45,7 @@ header_template = """
 @prefix albers: <http://www.opengis.net/def/crs/EPSG/0/3577> .
 
 l: a loci:Linkset ;
-  dct:title {header_title} ;
+  dct:title "{header_title}" ;
   dct:description \"\"\"{header_description}\"\"\"@en;
   dct:publisher <http://catalogue.linked.data.gov.au/org/O-000886> ;
   dc:publisher "CSIRO" ;
@@ -60,13 +60,13 @@ l: a loci:Linkset ;
 _:linkset_prov_p a prov:Plan ;
     rdfs:label "Spatial Intersection Method" ;
     prov:value <https://github.com/CSIRO-enviro-informatics/loci-cache-scripts/tree/linksets-builder> ;
-    rdfs:comment {provenance_comment};
+    rdfs:comment "{provenance_comment}";
     prov:wasAttributedTo _:contact;
     prov:generatedAtTime "{creation_date}"^^xsd:date .
 
 _:contact a vcard:Individual ;
   vcard:fn {contact_name} ;
-  vcard:hasEmail <{contact_email}> .
+  vcard:hasEmail {contact_email} .
 """
 
 from_area_template = """\
