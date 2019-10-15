@@ -17,6 +17,7 @@ def load_geofabric_riverregions():
 
     linksets_builder.load_via_ogr("../assets/HR_Regions_GDB/HR_Regions.gdb", "from", source_data_table="RiverRegion", define_target_geometry_type=None)
     utils.alter_column_name("from", "hydroid", "hydroid_rr")
+    utils.buffer_geometry("from", "geom_3577", 10)
     from_id_column = "hydroid_rr"
     return from_id_column
 

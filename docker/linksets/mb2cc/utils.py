@@ -24,6 +24,15 @@ def alter_column_name(table_name, column_name, new_column_name):
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_intersection_sql])
 
+def buffer_geometry(table_name, geometry_column_name, buffer_size = 1):
+    '''
+    Fix geometry of self intersecting polygons
+    '''
+    buffer_fix_sql= """UPDATE  \"{table_name}\" SET \"{column_name}\" = ST_MULTI(ST_BUFFER(\"{column_name}\", {buffer_size}))"""\
+        .format(table_name=table_name, column_name=geometry_column_name, buffer_size=buffer_size)
+    run_command(["psql", "--host", "postgis", "--user",
+                 "postgres", "-d", "mydb", "-c", buffer_fix_sql])
+
 def geometry_fix(table_name, geometry_column_name):
     '''
     Fix geometry of self intersecting polygons
