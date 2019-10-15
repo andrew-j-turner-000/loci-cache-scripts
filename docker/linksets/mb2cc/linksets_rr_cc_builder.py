@@ -33,7 +33,4 @@ if __name__ == "__main__":
     to_id_column = load_to_data()
 
     # Generic linksets builder logic
-    linksets_builder.create_geometry_indexes()
-    linksets_builder.create_intersections(from_id_column, to_id_column)
-    linksets_builder.create_intersections_areas(from_id_column, to_id_column)
-    linksets_builder.create_classifier_views()
+    linksets_builder.build_linkset(from_id_column, to_id_column)

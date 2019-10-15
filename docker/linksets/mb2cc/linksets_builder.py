@@ -98,6 +98,13 @@ def load_asgs_mb():
     from_id_column = "mb_code_20"
     return from_id_column 
 
+def fix_geometries():
+    '''
+    makes valid any invalid geometries in the from and to tables
+    '''
+    utils.geometry_fix("from", "geom_3577")
+    utils.geometry_fix("to", "geom_3577")
+
 def create_geometry_indexes():
     '''
     Create indexes on geometry columns for performance
@@ -191,6 +198,12 @@ def create_classifier_views():
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_classifier_views_sql])
 
+def build_linkset(from_id_column, to_id_column):
+    fix_geometries()
+    create_geometry_indexes()
+    create_intersections(from_id_column, to_id_column)
+    create_intersections_areas(from_id_column, to_id_column)
+    create_classifier_views()
 
 if __name__ == "__main__":
     #Generic preparation logic
@@ -205,7 +218,4 @@ if __name__ == "__main__":
     to_id_column = load_to_data()
 
     # Generic linksets builder logic
-    create_geometry_indexes()
-    create_intersections(from_id_column, to_id_column)
-    create_intersections_areas(from_id_column, to_id_column)
-    create_classifier_views()
+    build_linkset(from_id_column, to_id_column)

@@ -24,6 +24,15 @@ def alter_column_name(table_name, column_name, new_column_name):
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_intersection_sql])
 
+def geometry_fix(table_name, geometry_column_name):
+    '''
+    Fix geometry of self intersecting polygons
+    '''
+    buffer_fix_sql= """UPDATE  \"{table_name}\" SET \"{column_name}\" = ST_MakeValid(\"{column_name}\") WHERE ST_IsValid(\"{column_name}\") = FALSE;"""\
+        .format(table_name=table_name, column_name=geometry_column_name)
+    run_command(["psql", "--host", "postgis", "--user",
+                 "postgres", "-d", "mydb", "-c", buffer_fix_sql])
+
 
 def fail_or_getenv(env_var_name, warn_only=False):
     env_value = os.getenv(env_var_name)
