@@ -17,7 +17,7 @@ utils.fail_or_getenv('AWS_SECRET_ACCESS_KEY')
 asgs_2016_local_name_prefix = "mb_2016_all_shape"
 
 
-def load_via_ogr(source_data, define_target_geometry_type='MULTIPOLYGON', limit=LIMIT_LOAD):
+def load_via_ogr(source_data, target_table_name, source_data_table=None, define_target_geometry_type='MULTIPOLYGON', limit=LIMIT_LOAD):
     '''
     Loads spatial data into postgis
     :param source_data: source data for ogr2ogr to load into postgres
@@ -32,8 +32,12 @@ def load_via_ogr(source_data, define_target_geometry_type='MULTIPOLYGON', limit=
     if define_target_geometry_type is not None:
         target_geometry_args = ["-nlt", define_target_geometry_type]
 
+    source_data_table_args = []
+    if source_data_table is not None:
+        source_data_table_args = [source_data_table]
+
     run_command(["ogr2ogr", "-f", "PostgreSQL", "PG:host=postgis port=5432 dbname=mydb user=postgres password=password",
-                source_data, "-skipfailures", "-overwrite", "-progress"] + target_geometry_args + limit_args + ["--config", "PG_USE_COPY", "YES"])
+                source_data, "-skipfailures", "-overwrite", "-progress", "-nln", target_table_name] + source_data_table_args + ["-lco", "GEOMETRY_NAME=geom_3577", "-lco", "PRECISION=NO", "-t_srs", "EPSG:3577"] + target_geometry_args + limit_args + ["--config", "PG_USE_COPY", "YES"])
 
 
 def prepare_database():
@@ -45,18 +49,6 @@ def prepare_database():
     run_command(["psql", "--host", "postgis", "--user", "postgres", "-c", "CREATE DATABASE mydb;"])
     run_command(["psql", "--host", "postgis", "--user", "postgres", "-d", "mydb", 
                 "-c", "CREATE EXTENSION postgis; CREATE EXTENSION postgis_topology;"])
-
-
-def load_asgs_mb():
-    '''
-    Load ASGS Mesh Blocks into PostGIS
-    Note: `-nlt MULTIPOLYGON` is specified here, because by default it will ingest as MULTISURFACE, which doesn't work well for our use-case.
-    There will be some errors when it tries to import mb_mb_pt, because it POINTS don't work with MULTIPOLYGON layer types. Ignore this. We don't use mb_pt
-    All ASGS coords are in crs EPSG:3857, this needs to be transformed to albers (EPSG:3577) in the sql query in order to do constant-area intersections with catchments 
-    eg: ST_Transform(shape, 3577)
-    '''
-    logging.info("Loading asgs meshblocks")
-    load_via_ogr("../assets/{}/MB_MB.shp".format(asgs_2016_local_name_prefix))
 
 
 def get_s3_assets(local_file_name_save_to, s3_bucket, s3_path):
@@ -88,22 +80,30 @@ def load_geofabric_catchments():
     eg: ST_GeomFromWKB(shape, 4326). Then we need to convert it to albers (EPSG:3577) in order to do constant-area intersections with meshblocks.
     '''
     logging.info("Loading geofabric catchments")
-    load_via_ogr("../assets/HR_Catchments_GDB/HR_Catchments.gdb", define_target_geometry_type=None)
+    load_via_ogr("../assets/HR_Catchments_GDB/HR_Catchments.gdb", "to", source_data_table="AHGFContractedCatchment", define_target_geometry_type=None)
+    to_id_column = "hydroid"
+    return to_id_column
 
 
-def harmonize_crs_albers():
+def load_asgs_mb():
     '''
-    Harmonize CRS to albers (EPSG:3577) in otder to do constant-area intersections with meshblocks
+    Load ASGS Mesh Blocks into PostGIS
+    Note: `-nlt MULTIPOLYGON` is specified here, because by default it will ingest as MULTISURFACE, which doesn't work well for our use-case.
+    There will be some errors when it tries to import from_pt, because it POINTS don't work with MULTIPOLYGON layer types. Ignore this. We don't use mb_pt
+    All ASGS coords are in crs EPSG:3857, this needs to be transformed to albers (EPSG:3577) in the sql query in order to do constant-area intersections with catchments 
+    eg: ST_Transform(shape, 3577)
     '''
-    logging.info("Harmonizing coordinates to the albers reference system")
-    harmonize_crs_sql = """
-    ALTER TABLE public.\"mb_mb\" ADD COLUMN geom_3577 geometry(Geometry,3577);
-    UPDATE public.\"mb_mb\" SET geom_3577 = ST_MakeValid(ST_Transform(wkb_geometry,3577));
-    ALTER TABLE public.\"ahgfcontractedcatchment\" ADD COLUMN geom_3577 geometry(Geometry,3577);
-    UPDATE public.\"ahgfcontractedcatchment\" SET geom_3577 = ST_Transform(ST_MakeValid(ST_GeomFromEWKB(shape)),3577);
-    """
-    run_command(["psql", "--host", "postgis", "--user", "postgres", "-d", "mydb", "-c", harmonize_crs_sql])
+    logging.info("Loading asgs meshblocks")
+    load_via_ogr("../assets/{}/MB_MB.shp".format(asgs_2016_local_name_prefix), "from")
+    from_id_column = "mb_code_20"
+    return from_id_column 
 
+def fix_geometries():
+    '''
+    makes valid any invalid geometries in the from and to tables
+    '''
+    utils.geometry_fix("from", "geom_3577")
+    utils.geometry_fix("to", "geom_3577")
 
 def create_geometry_indexes():
     '''
@@ -111,125 +111,111 @@ def create_geometry_indexes():
     '''
     logging.info("Creating Geometry Indexes")
     create_geometry_indexes_sql = """
-    CREATE INDEX mb_geom_3577_gix ON public.\"mb_mb\" USING GIST (geom_3577);
-    CREATE INDEX cc_geom_3577_gix ON public.\"ahgfcontractedcatchment\" USING GIST (geom_3577);
+    CREATE INDEX from_geom_3577_gix ON public.\"from\" USING GIST (geom_3577);
+    CREATE INDEX to_geom_3577_gix ON public.\"to\" USING GIST (geom_3577);
     """
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_geometry_indexes_sql])
 
 
-def create_intersections():
-    logging.info("Calculating intersecting mb and cc")
-    create_intersection_sql = """
-    CREATE MATERIALIZED VIEW mbintersectcc_mv AS
-    SELECT mb.mb_code_20, ca.hydroid, ST_Intersection(mb.geom_3577, ca.geom_3577) as i
-    FROM public.\"ahgfcontractedcatchment\" as ca
-    INNER JOIN public.\"mb_mb\" as mb ON mb.geom_3577 && ca.geom_3577 -- the && specifies an indexed bounding box lookup
-    WHERE ST_IsValid(ca.geom_3577) AND ST_IsValid(mb.geom_3577) AND ST_Intersects(mb.geom_3577, ca.geom_3577)
-    ORDER BY mb.mb_code_20 ASC;
-    CREATE MATERIALIZED VIEW ccintersectmb_mv AS
-    SELECT ca.hydroid, mb.mb_code_20, ST_Intersection(ca.geom_3577, mb.geom_3577) as i
-    FROM public.\"mb_mb\" as mb
-    INNER JOIN public.\"ahgfcontractedcatchment\" as ca ON ca.geom_3577 && mb.geom_3577 -- the && specifies an indexed bounding box lookup
-    WHERE ST_IsValid(ca.geom_3577) AND ST_IsValid(mb.geom_3577) AND ST_Intersects(ca.geom_3577, mb.geom_3577)
-    ORDER BY ca.hydroid ASC;
+def create_intersections(from_id_column, to_id_column):
     """
+    Intersects from and to tables 
+    :param from_id_column: name of a column containing a unique key in the from geospatial table it will be used for suffixing identifiers later 
+    :param to_id_column: name of a column containing a unique key in the to geospatial table it will be used for suffixing identifiers later 
+    """
+    logging.info("Calculating intersecting from and to")
+    create_intersection_sql = """
+    CREATE MATERIALIZED VIEW fromintersectto_mv AS
+    SELECT from_t.\"{from_id_column}\", to_t.\"{to_id_column}\", ST_Intersection(from_t.geom_3577, to_t.geom_3577) as i
+    FROM public.\"to\" as to_t 
+    INNER JOIN public.\"from\" as from_t ON from_t.geom_3577 && to_t.geom_3577 -- the && specifies an indexed bounding box lookup
+    WHERE ST_IsValid(to_t.geom_3577) AND ST_IsValid(from_t.geom_3577) AND ST_Intersects(from_t.geom_3577, to_t.geom_3577)
+    ORDER BY from_t.\"{from_id_column}\" ASC;
+    CREATE MATERIALIZED VIEW tointersectfrom_mv AS
+    SELECT to_t.\"{to_id_column}\", from_t.\"{from_id_column}\", ST_Intersection(to_t.geom_3577, from_t.geom_3577) as i
+    FROM public.\"from\" as from_t
+    INNER JOIN public.\"to\" as to_t ON to_t.geom_3577 && from_t.geom_3577 -- the && specifies an indexed bounding box lookup
+    WHERE ST_IsValid(to_t.geom_3577) AND ST_IsValid(from_t.geom_3577) AND ST_Intersects(to_t.geom_3577, from_t.geom_3577)
+    ORDER BY to_t.\"{to_id_column}\" ASC;
+    """.format(from_id_column=from_id_column, to_id_column=to_id_column)
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_intersection_sql])
 
-def create_indexes():
-    '''
-    Create indexes on geometry columns for performance
-    '''
-    logging.info("Creating Geometry Indexes")
-    create_geometry_indexes_sql = """
-    CREATE INDEX mbintersects_mb_code_idx ON public.\"mbintersectccareas\" USING GIST (mb_code_20);
-    CREATE INDEX mbintersects_hydroid_idx ON public.\"ccintersectsmbareas\" USING GIST (hydroid);
-    CREATE INDEX _mb_code_idx ON public.\"mbintersectcc_mv\" USING GIST (mb_code_20);
-    CREATE INDEX mbintersects_hydroid_idx ON public.\"mbintersectcc_mv\" USING GIST (hydroid);
+
+
+def create_intersections_areas(from_id_column, to_id_column):
     """
-    run_command(["psql", "--host", "postgis", "--user",
-                 "postgres", "-d", "mydb", "-c", create_geometry_indexes_sql])
-
-
-def create_intersections_areas():
-    logging.info("Calculating intersecting area for mb and cc")
+    Calculates intersecting areas
+    :param from_id_column: name of a column containing a unique key in the from geospatial table it will be used for suffixing identifiers later 
+    :param to_id_column: name of a column containing a unique key in the to geospatial table it will be used for suffixing identifiers later 
+    """
+    logging.info("Calculating intersecting area for from and to")
     create_intersection_areas_sql = """
-    CREATE VIEW mbintersectccareas AS
-    SELECT s.mb_code_20, s.hydroid, s.mb_area, s.cc_area, s.i_area, (s.i_area / s.mb_area) as mb_proportion, (s.i_area / s.cc_area) as cc_proportion, s.geomcollection FROM (
-    SELECT mv.mb_code_20,
-           mv.hydroid,
-           ST_Area(mb.geom_3577)                         as mb_area,
-           ST_Area(ca.geom_3577)                         as cc_area,
+    CREATE VIEW fromintersecttoareas AS
+    SELECT s.\"{from_id_column}\", s.\"{to_id_column}\", s.from_area, s.to_area, s.i_area, (s.i_area / s.from_area) as from_proportion, (s.i_area / s.to_area) as to_proportion, s.geomcollection FROM (
+    SELECT mv.\"{from_id_column}\",
+           mv.\"{to_id_column}\",
+           ST_Area(from_t.geom_3577)                         as from_area,
+           ST_Area(to_t.geom_3577)                         as to_area,
            ST_Area(mv.i)                                 as i_area,
-           ST_Collect(ARRAY[ca.geom_3577, mb.geom_3577, mv.i]) as geomcollection
-    FROM mbintersectcc_mv as mv
-    INNER JOIN public.\"mb_mb\" as mb ON mb.mb_code_20 = mv.mb_code_20
-    INNER JOIN public.\"ahgfcontractedcatchment\" as ca ON ca.hydroid = mv.hydroid
+           ST_Collect(ARRAY[to_t.geom_3577, from_t.geom_3577, mv.i]) as geomcollection
+    FROM fromintersectto_mv as mv
+    INNER JOIN public.\"from\" as from_t ON from_t.\"{from_id_column}\" = mv.\"{from_id_column}\"
+    INNER JOIN public.\"to\" as to_t ON to_t.\"{to_id_column}\" = mv.\"{to_id_column}\"
     ) as s;
-    CREATE VIEW ccintersectmbareas AS
-    SELECT s.hydroid, s.mb_code_20, s.cc_area, s.mb_area, s.i_area, (s.i_area / s.cc_area) as cc_proportion, (s.i_area / s.mb_area) as mb_proportion, s.geomcollection FROM (
-    SELECT mv.hydroid,
-           mv.mb_code_20,
-           ST_Area(ca.geom_3577)                         as cc_area,
-           ST_Area(mb.geom_3577)                         as mb_area,
+    CREATE VIEW tointersectfromareas AS
+    SELECT s.\"{to_id_column}\", s.\"{from_id_column}\", s.to_area, s.from_area, s.i_area, (s.i_area / s.to_area) as to_proportion, (s.i_area / s.from_area) as from_proportion, s.geomcollection FROM (
+    SELECT mv.\"{to_id_column}\",
+           mv.\"{from_id_column}\",
+           ST_Area(to_t.geom_3577)                         as to_area,
+           ST_Area(from_t.geom_3577)                         as from_area,
            ST_Area(mv.i)                                 as i_area,
-           ST_Collect(ARRAY[mb.geom_3577, ca.geom_3577, mv.i]) as geomcollection
-    FROM ccintersectmb_mv as mv
-    INNER JOIN public.\"ahgfcontractedcatchment\" as ca ON ca.hydroid = mv.hydroid
-    INNER JOIN public.\"mb_mb\" as mb ON mb.mb_code_20 = mv.mb_code_20
+           ST_Collect(ARRAY[from_t.geom_3577, to_t.geom_3577, mv.i]) as geomcollection
+    FROM tointersectfrom_mv as mv
+    INNER JOIN public.\"to\" as to_t ON to_t.\"{to_id_column}\" = mv.\"{to_id_column}\"
+    INNER JOIN public.\"from\" as from_t ON from_t.\"{from_id_column}\" = mv.\"{from_id_column}\"
     ) as s;
-    """
+    """.format(from_id_column=from_id_column, to_id_column=to_id_column)
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_intersection_areas_sql])
-
-
-def find_bad_meshblocks():
-    '''
-    Find bad mesblocks
-    Meshblocks smaller than an specified area and meshblock proportion (is that amount in the meshblock when it intersects?)
-    is larger than a small ratio
-    or 
-    Mesblocks where intersecting area smaller than a specified area 
-    and catchment proportion (maybe the amount intersecting that is in the catchment) is larger than a small ratio 
-    '''
-    logging.info("Finding bad meshblocks (unused at the moment)")
-    find_bad_meshblocks_sql = """
-    CREATE MATERIALIZED VIEW bad_meshblocks as
-    SELECT mb.mb_code_20, mb.hydroid FROM mbintersectccareas as mb
-    WHERE mb.mb_area < 1100.0 and ((mb_proportion >= 0.010)or(cc_proportion >= 0.010)) and i_area <= 50.0;
-    """
-    run_command(["psql", "--host", "postgis", "--user",
-                 "postgres", "-d", "mydb", "-c", find_bad_meshblocks_sql])
+#
 
 def create_classifier_views():
     '''
-    annotate meshblocks and cc to indicate whether they are considered truely overlapping or close enough to be within
+    annotate from and to, to indicate whether they are considered truely overlapping or close enough to be within
     when they intersect 
     '''
     logging.info("Classifying ambiguous overlapping meshblocks thresholds")
     create_classifier_views_sql = """
-    CREATE VIEW mbintersectccareas_classify AS
-    SELECT mb.*, mb_proportion >= 0.010 as is_overlaps, mb_proportion >=0.990 as is_within
-    FROM mbintersectccareas as mb;
-    -- (TODO: minus bad meshblocks)
-    CREATE VIEW ccintersectmbareas_classify AS
-    SELECT cc.*, cc_proportion >= 0.010 as is_overlaps, cc_proportion >=0.990 as is_within
-    FROM ccintersectmbareas as cc;
+    CREATE VIEW fromintersecttoareas_classify AS
+    SELECT from_t.*, from_t.from_proportion >= 0.010 as is_overlaps, from_t.from_proportion >=0.990 as is_within
+    FROM fromintersecttoareas as from_t;
+    CREATE VIEW tointersectfromareas_classify AS
+    SELECT to_t.*, to_t.to_proportion >= 0.010 as is_overlaps, to_t.to_proportion >=0.990 as is_within
+    FROM tointersectfromareas as to_t;
     """
     run_command(["psql", "--host", "postgis", "--user",
                  "postgres", "-d", "mydb", "-c", create_classifier_views_sql])
 
+def build_linkset(from_id_column, to_id_column):
+    fix_geometries()
+    create_geometry_indexes()
+    create_intersections(from_id_column, to_id_column)
+    create_intersections_areas(from_id_column, to_id_column)
+    create_classifier_views()
 
 if __name__ == "__main__":
+    #Generic preparation logic
     prepare_database()
+
+    #Specific meshblock and catchment logic TODO: This and generic logic will be seperated further in future refactors
     get_geofabric_assets()
     get_meshblock_assets()
-    load_asgs_mb()
-    load_geofabric_catchments()
-    harmonize_crs_albers()
-    create_geometry_indexes()
-    create_intersections()
-    create_intersections_areas()
-    find_bad_meshblocks()
-    create_classifier_views()
+    load_from_data = load_asgs_mb
+    load_to_data = load_geofabric_catchments
+    from_id_column = load_from_data()
+    to_id_column = load_to_data()
+
+    # Generic linksets builder logic
+    build_linkset(from_id_column, to_id_column)

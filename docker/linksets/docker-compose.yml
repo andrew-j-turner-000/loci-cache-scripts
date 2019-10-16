@@ -20,7 +20,7 @@ services:
     depends_on:
       - postgis
     #command: /bin/sh -c 'tail -f /dev/null'
-    command: /bin/sh -c 'curl https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh -o ./wait-for-it.sh && chmod +x ./wait-for-it.sh && ./wait-for-it.sh postgis:5432 && cd /app/linksets/mb2cc && python linksets_builder.py && python linksets_triples_builder.py && python upload_ttl.py'
+    command: /bin/sh -c 'curl https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh -o ./wait-for-it.sh && chmod +x ./wait-for-it.sh && ./wait-for-it.sh postgis:5432 && cd /app/linksets/mb2cc && python linksets_builder.py && python linksets_triples_builder.py && python upload_mbcc_ttl.py'
 
   postgis:
     image: mdillon/postgis:11
